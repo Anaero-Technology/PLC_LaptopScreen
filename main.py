@@ -200,9 +200,10 @@ class MainWindow(tkinter.Frame):
             self.radioFrame.grid_rowconfigure(i, weight=1)
 
         for i in range(0, len(self.machineList)):
-            radioButton = tkinter.Radiobutton(self.radioFrame, text=self.machineList[i], variable=self.selectedType, value=i, command=self.typeChanged, font=self.menuFont)
-            radioButton.grid(row=i, column=0, sticky="W")
-            self.machineRadioButtons.append(radioButton)
+            if i > 1:
+                radioButton = tkinter.Radiobutton(self.radioFrame, text=self.machineList[i], variable=self.selectedType, value=i, command=self.typeChanged, font=self.menuFont)
+                radioButton.grid(row=i, column=0, sticky="W")
+                self.machineRadioButtons.append(radioButton)
 
         #Create the connect button
         self.connectButton = tkinter.Button(self.connectOptionsFrame, text="Connect", command=self.connectPressed, font=self.menuFont, bg=self.buttonColour)
