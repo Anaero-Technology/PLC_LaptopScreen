@@ -1420,7 +1420,7 @@ class MainWindow(tkinter.Frame):
                 feederObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(feedData[0])))
                 feederObject["onTimeLabel"].configure(text="Feed For: {0}s".format(feedData[2]))
                 feederObject["offTimeLabel"].configure(text="Every: {0}min".format(feedData[3]))
-                feederObject["nextFeedLabel"].configure(text="Next Feed: {0}:{1}:{2}".format(*feedData[5]))
+                feederObject["nextFeedLabel"].configure(text="Next Feed: {0}:{1}".format(*feedData[5]))
                 #Change enabled label text and colour
                 if feedData[1]:
                     feederObject["enabledLabel"].configure(text="Enabled", fg="green")
