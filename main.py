@@ -623,14 +623,16 @@ class MainWindow(tkinter.Frame):
             stateLabel = tkinter.Label(feedFrame, text="State: Off")
             onTimeLabel = tkinter.Label(feedFrame, text="Feed For: 0s")
             offTimeLabel = tkinter.Label(feedFrame, text="Every 0min")
+            nextFeedLabel = tkinter.Label(feedFrame, text="Next Feed: 00:00:00")
             enabledLabel = tkinter.Label(feedFrame, text="Disabled", fg="red")
             titleLabel.pack()
             stateLabel.pack()
             onTimeLabel.pack()
             offTimeLabel.pack()
+            nextFeedLabel.pack()
             enabledLabel.pack()
             #Create the object and add to the list
-            feederObject = {"frame" : feedFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "onTimeLabel" : onTimeLabel, "offTimeLabel" : offTimeLabel, "enabledLabel" : enabledLabel}
+            feederObject = {"frame" : feedFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "onTimeLabel" : onTimeLabel, "offTimeLabel" : offTimeLabel, "enabledLabel" : enabledLabel, "nextFeedLabel" : nextFeedLabel}
             self.feederSettingsObjects.append(feederObject)
         
         #Pack the objects
@@ -1410,10 +1412,15 @@ class MainWindow(tkinter.Frame):
                 #Get the feeder data and object
                 feedData = self.statusFeederData[feederNum]
                 feederObject = self.feederSettingsObjects[feederNum]
+                if feedData[5][1] < 10:
+                    feedData[5][1] = "0" + str(feedData[5][1])
+                if feedData[5][2] < 10:
+                    feedData[5][2] = "0" + str(feedData[5][2])
                 #Change text labels to show correct information
                 feederObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(feedData[0])))
                 feederObject["onTimeLabel"].configure(text="Feed For: {0}s".format(feedData[2]))
                 feederObject["offTimeLabel"].configure(text="Every: {0}min".format(feedData[3]))
+                feederObject["nextFeedLabel"].configure(text="Next Feed: {0}:{1}:{2}".format(*feedData[5]))
                 #Change enabled label text and colour
                 if feedData[1]:
                     feederObject["enabledLabel"].configure(text="Enabled", fg="green")
@@ -1585,7 +1592,7 @@ class MainWindow(tkinter.Frame):
                         #Get the feeder number
                         feederNumber = i - (7 + numberReactors)
                         #Store the feeder data as booleans or integers
-                        self.statusFeederData[feederNumber] = [feederInfo[0] == 1, feederInfo[1] == 1, feederInfo[2], feederInfo[3], feederInfo[4], [feederInfo[7], feederInfo[6], feederInfo[5]]]
+                        self.statusFeederData[feederNumber] = [feederInfo[0] == 1, feederInfo[1] == 1, feederInfo[2], feederInfo[3], feederInfo[4], [feederInfo[5], feederInfo[6], feederInfo[7]]]
                     else:
                         raise Exception("Incorrect information about feeder")
                 #Calculate index of the maintenance flag and determine value
@@ -1809,7 +1816,7 @@ class MainWindow(tkinter.Frame):
             if values[0] != None and values[1] != None:
                 try:
                     #Convert to integers
-                    feedTime = int(values[0])
+                    feedTime = round(float(values[0]), 1)
                     feedDelay = int(values[1])
                     #Change the value
                     self.settingChange(0, [feedTime, feedDelay])
