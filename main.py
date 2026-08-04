@@ -151,25 +151,23 @@ class MainWindow(tkinter.Frame):
             self.reactorMedusaStateImages.append(image)
         
         #List of machine names and identifiers, used for CONTINUE_??? command to identify correct machine
-        self.machineList = ["Ray", "Ray-3", "Ray-I", "Caterpillar", "Lobster", "MAX-I", "Black Swan", "Medusa"]
-        self.machineIdentifiers = ["_RAY", "_RAY", "_RAY", "_CAT", "_LOB", "_MAX", "_BS_S1S2", "_MEDUSA"]
+        self.machineList = ["Ray", "Ray-I", "Caterpillar", "Lobster", "Lobster-I", "Black Swan", "Medusa"]
+        self.machineIdentifiers = ["ray", "ray-i" "caterpillar", "lobster", "lobster-i", "blackswan", "medusa"]
         self.machineRadioButtons = []
 
         #Constants used to refer to each machine type (so the correct index is used)
         self.RAY = 0
-        self.RAY3 = 1
-        self.RAYI = 2
-        self.CATERPILLAR = 3
-        self.LOBSTER = 4
-        self.LOBSTERI = 5
-        self.BLACKSWAN = 6
-        self.MEDUSA = 7
+        self.RAYI = 1
+        self.CATERPILLAR = 2
+        self.LOBSTER = 3
+        self.LOBSTERI = 4
+        self.BLACKSWAN = 5
+        self.MEDUSA = 6
         
         #Arrays describing how the machines reactors and feeders are laid out
         #Machine shape: [Reactor number, row, column]
         #Machine feeders: [Feeder number, [reactors], [rowPos, colPos, height, width]]
         self.machineShape = [[["1", 2, 4], ["2", 2, 3]], #Ray
-                             [["1", 2, 4], ["2", 2, 3], ["3", 2, 2]], #Ray-3
                              [["1", 2, 4], ["2", 2, 3]], #Ray-I
                              [["1", 2, 4], ["2", 2, 3], ["3", 2, 2], ["4", 2, 1], ["5", 2, 0]], #Caterpillar
                              [["1", 2, 4], ["2", 2, 3], ["3", 2, 2], ["4", 3, 2], ["5", 3, 3], ["6", 3, 4]], #Lobster
@@ -178,7 +176,6 @@ class MainWindow(tkinter.Frame):
                              [["1", 3, 4], ["2", 3, 3], ["3", 3, 2], ["4", 3, 1], ["5", 3, 0], ["6", 2, 4], ["7", 2, 3],    ["8", 2, 2], ["9", 2, 1], ["10", 2, 0]]] #Medusa
         self.machineFeeders = [[["1", [0, 1], [1, 3, 1, 2]]], #Ray
                                [["1", [0, 1, 2], [1, 2, 1, 3]]], #Ray-3
-                               [["1", [0], [1, 4, 1, 1]], ["2", [1], [1, 3, 1, 1]]], #Ray-I
                                [["1", [0, 1, 2, 3, 4], [1, 0, 1, 5]],], #Caterpillar
                                [["1", [0, 1, 2], [1, 2, 1, 3]], ["2", [3, 4, 5], [4, 2, 1, 3]]], #Lobster
                                [["1", [0], [1, 4, 1, 1]], ["2", [1], [1, 3, 1, 1]], ["3", [2], [4, 3, 1, 1]], ["4", [3], [4, 4, 1, 1]]], #Lobster-I
@@ -186,7 +183,6 @@ class MainWindow(tkinter.Frame):
                                [["1", [0, 1, 2, 3, 4], [1, 0, 1, 5]], ["2", [5, 6, 7, 8, 9], [4, 0, 1, 5]]]] #Medusa
         
         self.machineNumbers = [{"mixers" : 2, "heaters" : 2, "agitators" : 2}, #Ray
-                               {"mixers" : 3, "heaters" : 3, "agitators" : 3}, #Ray-3
                                {"mixers" : 2, "heaters" : 2, "agitators" : 2}, #Ray-I
                                {"mixers" : 5, "heaters" : 5, "agitators" : 5}, #Caterpillar
                                {"mixers" : 6, "heaters" : 6, "agitators" : 6}, #Lobster
@@ -743,30 +739,9 @@ class MainWindow(tkinter.Frame):
         self.awaitingConnection = False
         #If waiting for a response to a sent message
         self.awaitingMessage = False
-        #If currently receiving a status block
-        self.gettingStatus = False
-        #If the old status format has been tested
-        self.triedOldStatus = False
         #If waiting for the machine to start
         self.awaitingStartup = False
         self.loading = True
-        #Stored status block - made up of multiple lines so it is stored
-        self.currentStatus = []
-        #Expected length of original style and new style status blocks
-        self.statusLength = 0
-        self.statusNewLength = 0
-
-        #When the last status was received and how long to wait
-        self.lastStatus = 0
-        self.statusDelay = 1.0
-        self.statusTimeout = 2.0
-
-        #[[mix state, mix enabled, mix on time, mix off time], [heat state, heat enabled, heat current temp, heat target temp], [agitate state, agitate enabled, agitate time]]
-        self.statusReactorData = []
-        #[feed status, feed enabled, feed on for, feed off for, feed off until, [next hour, next min, next sec]]
-        self.statusFeederData = []
-        #[timeUnix, date, maintenance]
-        self.statusExtraData = []
 
         #Which reactors are selected to show up in settings
         self.currentSettingsReactors = []
@@ -895,28 +870,13 @@ class MainWindow(tkinter.Frame):
         feedInfo = self.machineFeeders[machineType]
 
         self.numberReactorsInUse = len(shape)
-        self.statusLength = 7 + len(shape) + len(feedInfo) + 2
 
         #OVERHAUL - use machineNumbers[] "mixers", "heaters", "agitators" to get this info
         currentMachineNumbers = self.machineNumbers[machineType]
         numMixers = currentMachineNumbers["mixers"]
         numHeaters = currentMachineNumbers["heaters"]
         numAgitators = currentMachineNumbers["agitators"]
-
-        #7 for time, 1 for each of the heaters, 1 for each of the mixers, 1 for each of the agitators, 1 for each of the feeders, 3 at end for system
-        self.statusNewLength = 7 + numMixers + numHeaters + numAgitators + len(feedInfo) + 3
-        #Old version left in case of issues
-        '''self.statusNewLength = 7 + (len(shape) * 3) + len(feedInfo) + 3
-        if machineType == self.BLACKSWAN:
-            #Remove two agitator lines for new black swan
-            self.statusNewLength = self.statusNewLength - 2
-        if machineType == self.MEDUSA:
-            #Remove 9 lines for the missing mixers
-            self.statusNewLength = self.statusNewLength - 9
-            #Remove 10 lines for the missing heaters
-            self.statusNewLength = self.statusNewLength - 10'''
         
-
         self.reactorTypes = self.reactorNormals[machineType]
 
     def failureBack(self) -> None:
@@ -938,7 +898,7 @@ class MainWindow(tkinter.Frame):
                     self.changeLoadingFrame(0)
                     self.changeMainFrame(1)
                     #Attempt to connect
-                    self.serialConnection = serial.Serial(port=self.connectedPort, baudrate=38400, timeout=0)
+                    self.serialConnection = serial.Serial(port=self.connectedPort, baudrate=115200, timeout=0)
                 except:
                     #If something went wrong
                     success = False
@@ -953,6 +913,8 @@ class MainWindow(tkinter.Frame):
                     #Start handling incoming messages
                     messageThread = Thread(target=self.checkMessages, daemon=True)
                     messageThread.start()
+
+                    self.pendingMessages.append("systemget\n")
 
                     self.awaitingConnection = True
                     self.loading = True
@@ -972,14 +934,14 @@ class MainWindow(tkinter.Frame):
             self.loadingText.configure(text="Connected To Machine, Retrieving Setup Information...")
             self.currentStatus = []
             #Request machine status
-            self.pendingMessages.append("GET_STATUS\n")
+            self.pendingMessages.append("statusget\n")
         else:
             #Change loading text
             self.loadingText.configure(text="Connected To Machine, Performing Startup...")
             self.awaitingStartup = True
             self.retrying = False
             #Start the machine using the correct messages for the current machine type
-            self.sendContinueMessages()
+            self.sendSystemSet()
             #Begin a thread to retry starting until timeout
             retryStartThread = Thread(target=self.resentContinueTimer, daemon=True)
             retryStartThread.start()
@@ -987,17 +949,15 @@ class MainWindow(tkinter.Frame):
         #Wating for a response to continue
         self.awaitingMessage = True
     
-    def sendContinueMessages(self) -> None:
+    def sendSystemSet(self) -> None:
         '''Send the messages to start the machine for the machine type'''
         #Get the current machine
         machine = self.selectedType.get()
         #If it is a valid machine type
         if machine > 0 and machine < len(self.machineIdentifiers):
             #Send the continue message with the correct extension
-            self.sendMessage("CONTINUE{0}\n".format(self.machineIdentifiers[machine]))
-        if self.retrying:
-            #From the second attempt onward also send the default 'CONTINUE' with no extension to catch older machines
-            self.sendMessage("CONTINUE\n")
+            self.add
+            self.sendMessage("systemset {0}\n".format(self.machineIdentifiers[machine]))
 
     def resentContinueTimer(self) -> None:
         '''Repeatedly send continue until a response is received or closed'''
@@ -1009,7 +969,7 @@ class MainWindow(tkinter.Frame):
             if self.awaitingStartup and not self.awaitingConnection and self.currentMain == 1:
                 #Resend the continue messages
                 self.retrying = True
-                self.sendContinueMessages()
+                self.sendSystemSet()
 
     def disconnect(self) -> None:
         '''Disconnect the serial communications'''
@@ -1151,26 +1111,55 @@ class MainWindow(tkinter.Frame):
         '''Handle the message that was received appropriately'''
         #Debug to output the message that was recieved to the console
         print("Received:", message)
+
+        messageParts = message.strip().split(" ");
         #If it was not a timing ping and debugging
-        if "PING" not in message and self.debugging:
+        if self.debugging:
             #Display message
             self.debugWindowObject.addText(message + "\n")
         #If waiting for initial connection
         if self.awaitingConnection:
             #If this is a timing response
-            if "STARTING" in message or "PING" in message:
+            if "system" in message:
                 #Determine if started yet
-                alreadyStarted = "STARTING" not in message
+                alreadyStarted = messageParts[1] != "none"
                 #Begin communications
                 self.connectionReceived(alreadyStarted)
+
+        if len(messageParts > 1) and messageParts[0] == "status":
+            try:
+                if messageParts[1] == "start" and len(messageParts) > 3:
+                    inMaintenance = messageParts[3] == "1"
+                elif messageParts[1] == "heater" and len(messageParts) > 6:
+                    heaterNumber = int(messageParts[2])
+                    heaterEnabled = messageParts[3] == "1"
+                    target = float(messageParts[4])
+                    actual = float(messageParts[5])
+                    heaterOn = messageParts[6] == "1"
+                elif messageParts[1] == "mixer" and len(messageParts) > 7:
+                    mixerNumber = int(messageParts[2])
+                    mixerEnabled = messageParts[3] == "1"
+                    mixerMode = int(messageParts[4])
+                    mixOnFor = int(messageParts[5])
+                    mixOffFor = int(messageParts[6])
+                    mixerOn = messageParts[7] == "1"
+                elif messageParts[1] == "feeder" and len(messageParts) > 6:
+                    feederNumber = int(messageParts[2])
+                    feederEnabled = messageParts[3] == "1"
+                    feedOnFor = int(messageParts[4])
+                    feedOffFor = int(messageParts[5])
+                    feederOn = messageParts[6] == "1"
+                elif messageParts[1] == "agitator" and len(messageParts) > 5:
+                    agitatorNumber = int(messageParts[2])
+                    agitatorEnabled = messageParts[3] == "1"
+                    prefeed = int(messageParts[4])
+                    agitatorOn = messageParts[5] == "1"
+            except:
+                pass
         
-        #If waiting to start and a timing message is received
-        if self.awaitingStartup and "PING" in message:
-            #Ask for status information
-            self.pendingMessages.append("GET_STATUS\n")
-            #No longer waiting
-            self.awaitingStartup = False
-            self.currentStatus = []
+        if len(messageParts) > 1 and messageParts[0] == "done" and messageParts[1] == "status":
+            self.updateFromStatus()
+        
         #If currently receiving a status block
         if self.gettingStatus:
             #Allowed characters
@@ -1232,13 +1221,11 @@ class MainWindow(tkinter.Frame):
             elif time.time() - self.lastStatus > self.statusTimeout:
                 #Start new status request
                 self.gettingStatus = False
-                self.pendingMessages.append("GET_STATUS\n")
+                self.pendingMessages.append("statusget\n")
                 self.lastStatus = time.time()
         if not self.gettingStatus:
-            #If a timing message is received
-            if "PING" in message:
-                #Send the next message to be sent, if there is one
-                self.sendQueuedMessage()
+            #Send the next message to be sent, if there is one
+            self.sendQueuedMessage()
             
     def connectionFailed(self) -> None:
         '''Display the failed to connect correctly screen'''
@@ -1265,14 +1252,8 @@ class MainWindow(tkinter.Frame):
             #Get the message
             message = self.pendingMessages[0]
             
-            #If this is a status message
-            if "GET_STATUS" in message:
-                #Setup variables to receive status
-                self.gettingStatus = True
-                self.triedOldStatus = False
-                self.currentStatus = []
             #If this is not a startup message or the machine is waiting to start
-            if "CONTINUE" not in message or self.awaitingStartup:
+            if "systemset" not in message or self.awaitingStartup:
                 #Send the message
                 self.sendMessage(message)
 
@@ -1503,265 +1484,6 @@ class MainWindow(tkinter.Frame):
         
         #Return the results: 2d list of data, if there were any invalid entries (bool)
         return numberArray, failed
-
-    def handleStatus(self) -> bool:
-        '''Attempt to process status block using original format'''
-        success = False
-        #Lists to hold reactor, feeder and other data
-        self.statusReactorData = []
-        self.statusFeederData = []
-        self.statusExtraData = []
-        
-        #If there are enough lines
-        if len(self.currentStatus) > self.statusLength - 1:
-            #Attempt, if an error occurrs it will be caught
-            try:
-                #Get the number of reactors and feeders
-                numberReactors = self.numberReactorsInUse
-                numberFeeders = len(self.machineFeeders[self.selectedType.get()])
-
-                #Iterate and add reactor information rows
-                for i in range(0, numberReactors):
-                    self.statusReactorData.append([[], [], []])
-                #Iterate and add feeder information rows
-                for i in range(0, numberFeeders):
-                    self.statusFeederData.append([])
-                
-                #Convert the status data to numbers
-                statusValues, failed = self.convertMessagesToNumbers(self.currentStatus)
-                #If one or more of the values was not a valid number
-                if failed:
-                    #Raise an exception, halting the process
-                    raise Exception("Non numeric value found, could not process")
-                
-                #Get the time and data from the first 7 rows
-                day, month, year = statusValues[0][0], statusValues[1][0], statusValues[2][0]
-                hour, minute, second = statusValues[3][0], statusValues[4][0], statusValues[5][0]
-                unixTime = statusValues[6][0]
-
-                #Iterate through the reactor rows
-                for i in range(7, 7 + numberReactors):
-                    #Get the reactor data
-                    reactorInfo = statusValues[i]
-                    #If there are enough items
-                    if len(reactorInfo) == 16:
-                        '''[0] MixerNo(int) (0-numReactors)
-                           [1] targetTemp(int)
-                           [2] currentTemp(float) (95.1 = Thermocouple disconnected, 95.3 = Exceeded max temperature)
-                           [3] heaterStatus(int(bool))
-                           [4] heaterEnabled(int(bool))
-                           [5] heaterOnTime(int) (seconds)
-                           [6] heaterOffTime(int) (seconds)
-                           [7] sensorPos(int) (0-numReactors, indicates which thermocouple is connected)
-                           [8] mixerStatus(int(bool)) 
-                           [9] mixerEnabled(int(bool))
-                           [10] mixerMode(int) (0 = Always off, 1 = Always on, 2 = Timed)
-                           [11] mixerOnTime(int) (seconds)
-                           [12] mixerOffTime(int) (seconds)
-                           [13] agitatorStatus(int(bool))
-                           [14] agitatorEnabled(int(bool))
-                           [15] agitatorTime(int) (seconds of agitating pre-feed)'''
-                        #Get the reactor id number
-                        reactorId = int(reactorInfo[0])
-                        #If it is in use and valid
-                        if reactorId > -1 and reactorId < numberReactors:
-                            #Store the mixer, heater and agitator values as booleans or integers
-                            self.statusReactorData[reactorId][0] = [reactorInfo[8] == 1, reactorInfo[9] == 1, reactorInfo[10], reactorInfo[11], reactorInfo[12]]
-                            self.statusReactorData[reactorId][1] = [reactorInfo[3] == 1, reactorInfo[4] == 1, reactorInfo[2], reactorInfo[1]]
-                            self.statusReactorData[reactorId][2] = [reactorInfo[13] == 1, reactorInfo[14] == 1, reactorInfo[15]]
-
-                        else:
-                            raise Exception("Invalid reactor number given")
-                    else:
-                        raise Exception("Incorrect information about reactor")
-                
-                #Iterate feeders being used
-                for i in range(7 + numberReactors, 7 + numberReactors + numberFeeders):
-                    #Get the feeder information
-                    feederInfo = statusValues[i]
-                    #If there are enough items
-                    if len(feederInfo) == 8:
-                        '''[0] Feeder Status (int(bool))
-                           [1] Feeder Enabled (int(bool))
-                           [2] Feeder On Time (int) (seconds)
-                           [3] Feeder Off Time (int) (seconds)
-                           [4] Feeder Off Until Time (int) (seconds until switch on (if enabled) unsigned long)
-                           [5] Next Feed Hour (hour of next feed (24hour clock)) (if enabled)
-                           [6] Next Feed Minute (minute of next feed) (if enabled)
-                           [7[ Next Feed Second (second of next feed) (if enabled)'''
-                        #Get the feeder number
-                        feederNumber = i - (7 + numberReactors)
-                        #Store the feeder data as booleans or integers
-                        self.statusFeederData[feederNumber] = [feederInfo[0] == 1, feederInfo[1] == 1, feederInfo[2], feederInfo[3], feederInfo[4], [feederInfo[5], feederInfo[6], feederInfo[7]]]
-                    else:
-                        raise Exception("Incorrect information about feeder")
-                #Calculate index of the maintenance flag and determine value
-                maintenanceIndex = 7 + numberReactors + numberFeeders
-                maintenanceMode = statusValues[maintenanceIndex][0] == 1
-                #Get the date type
-                ukDate = statusValues[maintenanceIndex + 1][0] == 1
-                date = "{0}/{1}/{2} {3}:{4}:{5}"
-                #Store date in correct format
-                if ukDate:
-                    date = date.format(day, month, year, hour, minute, second)
-                else:
-                    date = date.format(month, day, year, hour, minute, second)
-                #Store extra pieces of data
-                self.statusExtraData = [unixTime, date, maintenanceMode]
-                #The data was processed successfully
-                success = True
-            except Exception as e:
-                #Debug to allow errors to be found within try/except
-                #print("Exception Occurred:", e, "On Line:", sys.exc_info()[2].tb_lineno)
-                pass
-        #Clear current status - removed to allow for second attempt
-        #self.currentStatus = []
-        return success
-    
-    def handleNewStatus(self) -> bool:
-        '''Attempt to process status block using new format'''
-        success = False
-        #Get the machine id number
-        machineId = self.selectedType.get()
-        #Get the number of reactors and feeders
-        reactorNumber = len(self.machineShape[machineId])
-        numberFeeders = len(self.machineFeeders[machineId])
-
-        #Lists to store the reactor, feeder and extra data
-        self.statusReactorData = []
-        self.statusFeederData = []
-        self.statusExtraData = []
-
-        #If there are enough lines to process
-        if len(self.currentStatus) > self.statusNewLength - 1:
-            #Attempt to store the data
-            try:
-                #Convert to numbers
-                statusValues, failed = self.convertMessagesToNumbers(self.currentStatus)
-                #If any values were not numbers, raise an exception to terminate the process
-                if failed:
-                    print(self.currentStatus)
-                    raise Exception("Non numeric value found, could not process")
-
-                #Get the time and date
-                day, month, year = statusValues[0][0], statusValues[1][0], statusValues[2][0]
-                hour, minute, second = statusValues[3][0], statusValues[4][0], statusValues[5][0]
-                unixTime = statusValues[6][0]
-                
-                machineId = self.selectedType.get()
-
-                #Mixers, heaters and agitators for each reactor
-                #numberHeaters = reactorNumber
-                numberHeaters = self.machineNumbers[machineId]["heaters"]
-                #numberMixers = reactorNumber
-                numberMixers = self.machineNumbers[machineId]["mixers"]
-                #numberAgitators = reactorNumber
-                #numberAgitators = numberFeeders
-                numberAgitators = self.machineNumbers[machineId]["agitators"]
-
-                #Black swan has two reactors without mixers
-                """if machineId == self.BLACKSWAN:
-                    numberMixers = 8
-
-                #Medusa has no mixers or heaters
-                if machineId == self.MEDUSA:
-                    numberMixers = 0
-                    numberHeaters = 0"""
-
-                #Starting index for each group
-                #Heaters begin after times
-                heaterIndex = 7
-                #Mixers begin after heaters
-                mixerIndex = heaterIndex + numberHeaters
-                #Agitators begin after mixers
-                agitatorIndex = mixerIndex + numberMixers
-
-                #Feeders begin after agitators
-                feederIndex = agitatorIndex + numberAgitators
-                #Maintenage, date flag and sync are after feeder
-                maintinenceIndex = feederIndex + numberFeeders
-                dateFlagIndex = maintinenceIndex + 1
-                syncIndex = dateFlagIndex + 1
-                
-                print("Heaters: index:{0}, number:{1}".format(heaterIndex, numberHeaters))
-                print("Mixers: index:{0}, number:{1}".format(mixerIndex, numberMixers))
-                print("Agitators: index:{0}, number:{1}".format(agitatorIndex, numberAgitators))
-                print("Feeders: index:{0}, number:{1}".format(feederIndex, numberFeeders))
-
-                #All ints unless otherwise stated
-                #Iterate reactor number and add rows
-                for i in range(0, reactorNumber):
-                    self.statusReactorData.append([[], [], []])
-                #Iterate feeder number and add rows
-                for i in range(0, numberFeeders):
-                    self.statusFeederData.append([])
-
-                for i in range(heaterIndex, heaterIndex + numberHeaters):
-                    #For each of the heaters
-                    #target temp, current temp (float), heat status, heat enabled
-                    heaterId = i - heaterIndex
-                    heaterInfo = statusValues[i]
-                    targetTemp, currentTemp, heatStatus, heatEnabled = heaterInfo[0], heaterInfo[1], heaterInfo[2], heaterInfo[3]
-
-                    self.statusReactorData[heaterId][1] = [heatStatus == 1, heatEnabled == 1, currentTemp, targetTemp]
-
-                for i in range(mixerIndex, mixerIndex + numberMixers):
-                    #For each of the mixers
-                    #mix status, mix enabled, mix mode, mix on for, mix off for
-                    mixerId = i - mixerIndex
-                    mixerInfo = statusValues[i]
-                    mixStatus, mixEnabled, mixMode, mixOnTime, mixOffTime = mixerInfo[0], mixerInfo[1], mixerInfo[2], mixerInfo[3], mixerInfo[4]
-
-                    self.statusReactorData[mixerId][0] = [mixStatus == 1, mixEnabled == 1, mixMode, mixOnTime, mixOffTime]
-
-                for i in range(agitatorIndex, agitatorIndex + numberAgitators):
-                    #For each of the agitators
-                    #agi status, agi enabled, agi prefeed
-                    agitatorId = i - agitatorIndex
-                    agitatorInfo = statusValues[i]
-                    agitatorStatus, agitatorEnabled, agitatorTimeBefore = agitatorInfo[0], agitatorInfo[1], agitatorInfo[2]
-
-                    self.statusReactorData[agitatorId][2] = [agitatorStatus == 1, agitatorEnabled == 1, agitatorTimeBefore]
-
-                for i in range(feederIndex, feederIndex + numberFeeders):
-                    #For each of the feeders
-                    #feed status, feed enabled, feed on for, feed off for, feed off until, next feed hour, next feed min, next feed sec
-                    feederId = i - feederIndex
-                    feederInfo = statusValues[i]
-                    print("Feeder Info :", end="")
-                    print(feederInfo, end=" ")
-                    print(len(feederInfo))
-                    feederStatus, feederEnabled, feederOnTime, feederOffTime, feederOffUntil, feederNextHour, feederNextMin, feederNextSec = feederInfo[0], feederInfo[1], feederInfo[2], feederInfo[3], feederInfo[4], feederInfo[5], feederInfo[6], feederInfo[7]
-
-                    self.statusFeederData[feederId] = [feederStatus == 1, feederEnabled == 1, feederOnTime, feederOffTime, feederOffUntil, [feederNextHour, feederNextMin, feederNextSec]]
-
-                #Maintenace data
-                maintenanceMode = statusValues[maintinenceIndex][0] == 1
-                #Date flag
-                ukDate = statusValues[dateFlagIndex][0] == 1
-                date = "{0}/{1}/{2} {3}:{4}:{5}"
-                #Format date correctly
-                if ukDate:
-                    date = date.format(day, month, year, hour, minute, second)
-                else:
-                    date = date.format(month, day, year, hour, minute, second)
-
-                #Store extra data
-                self.statusExtraData = [unixTime, date, maintenanceMode]
-                
-                #Get and test sync value
-                sync = statusValues[syncIndex][0]
-                if sync != 1234:
-                    #Not correct, failure occurred
-                    raise Exception("Data stream not correctly synced, failure occurred")
-                #Processed sucessfully
-                success = True
-            except Exception as e:
-                #Debug used to find error in try/except
-                print("Exception Occurred:", e, "On Line:", sys.exc_info()[2].tb_lineno)
-                pass
-        
-        return success
 
     def setMixerTiming(self, values) -> None:
         '''When set is pressed on the mixer timing - check values and update'''
@@ -2055,7 +1777,7 @@ class MainWindow(tkinter.Frame):
             #If not currently getting status and time has elapsed
             if not self.gettingStatus and time.time() - self.lastStatus > self.statusDelay:
                 #Send get status message and store time
-                self.pendingMessages.append("GET_STATUS\n")
+                self.pendingMessages.append("statusget\n")
                 self.lastStatus = time.time()
             #Update the icons
             self.updateAllReactorIcons()
