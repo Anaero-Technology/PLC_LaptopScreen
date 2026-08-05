@@ -4,7 +4,7 @@ import tkinter.font as tkFont
 import serial
 from threading import Thread
 from serial.tools import list_ports
-import time, datetime
+import time
 import sys, os
 
 class MainWindow(tkinter.Frame):
@@ -152,7 +152,7 @@ class MainWindow(tkinter.Frame):
         
         #List of machine names and identifiers, used for CONTINUE_??? command to identify correct machine
         self.machineList = ["Ray", "Ray-I", "Caterpillar", "Lobster", "Lobster-I", "Black Swan", "Medusa"]
-        self.machineIdentifiers = ["ray", "ray-i" "caterpillar", "lobster", "lobster-i", "blackswan", "medusa"]
+        self.machineIdentifiers = ["ray", "ray-i", "caterpillar", "lobster", "lobster-i", "blackswan", "medusa"]
         self.machineRadioButtons = []
 
         #Constants used to refer to each machine type (so the correct index is used)
@@ -223,6 +223,9 @@ class MainWindow(tkinter.Frame):
         self.currentMessage = ""
         self.receivedMessages = []
         self.portLabels = []
+
+        self.gettingStatus = False
+        self.statusDelay = 2.0
 
         #Setup grid for the main machine display
         self.displayFrame.grid_rowconfigure(0, weight=1)
@@ -314,8 +317,6 @@ class MainWindow(tkinter.Frame):
         #Create buttons for config
         self.extraButtonsFrame = tkinter.Frame(self.displayFrame)
         self.extraButtonsFrame.grid(row=3, column=1)
-        self.timeSetButton = tkinter.Button(self.extraButtonsFrame, text="Set Pannel Time", command=self.setTime)
-        self.timeSetButton.grid(row=0, column=0)
         self.maintenanceModeButton = tkinter.Button(self.extraButtonsFrame, text="Maintenance Mode", command=self.startMaintenance)
         self.maintenanceModeButton.grid(row=0, column=1)
         
@@ -465,15 +466,13 @@ class MainWindow(tkinter.Frame):
             mixFrame = tkinter.Frame(self.mixerSettingsDisplayFrame)
             #Labels to show information
             titleLabel = tkinter.Label(mixFrame, text="Mixer {0}".format(reactorNum + 1))
-            stateLabel = tkinter.Label(mixFrame, text="State: Off")
+            stateLabel = tkinter.Label(mixFrame, text="State: Off", fg="red")
             timingLabel = tkinter.Label(mixFrame, text="0s On\n0s Off")
-            enabledLabel = tkinter.Label(mixFrame, text="Disabled", fg="red")
             titleLabel.pack()
             stateLabel.pack()
             timingLabel.pack()
-            enabledLabel.pack()
             #Create object and store in list
-            mixerObject = {"frame" : mixFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "timingLabel" : timingLabel, "enabledLabel" : enabledLabel}
+            mixerObject = {"frame" : mixFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "timingLabel" : timingLabel}
             self.mixerSettingsObjects.append(mixerObject)
         
         #Pack objects into frame
@@ -501,14 +500,6 @@ class MainWindow(tkinter.Frame):
         self.mixerEnableFrame = tkinter.Frame(self.mixerSettingsFrame)
         self.mixerEnableFrame.grid(row=2, column=0, columnspan=2)
 
-        self.mixerEnableLabel = tkinter.Label(self.mixerEnableFrame, text="Change State")
-        self.mixerEnableLabel.pack(side="top")
-        #Buttons to enable or disable the mixers
-        self.mixerDisabledButton = tkinter.Button(self.mixerEnableFrame, text="Disable", command=lambda : self.settingChange(2, 0))
-        self.mixerDisabledButton.pack(side="left")
-        self.mixerEnabledButton = tkinter.Button(self.mixerEnableFrame, text="Enable", command=lambda : self.settingChange(2, 1))
-        self.mixerEnabledButton.pack(side="right")
-
         #Heater settings frame configuration
         self.heaterSettingsFrame.grid_rowconfigure(0, weight=1)
         self.heaterSettingsFrame.grid_rowconfigure(1, weight=1)
@@ -523,17 +514,15 @@ class MainWindow(tkinter.Frame):
         for reactorNum in range(0, 10):
             heatFrame = tkinter.Frame(self.heaterSettingsDisplayFrame)
             titleLabel = tkinter.Label(heatFrame, text="Heater {0}".format(reactorNum + 1))
-            stateLabel = tkinter.Label(heatFrame, text="State: Off")
+            stateLabel = tkinter.Label(heatFrame, text="State: Off", fg="red")
             targetLabel = tkinter.Label(heatFrame, text="Target: 0°C")
             currentLabel = tkinter.Label(heatFrame, text="Current: 0°C")
-            enabledLabel = tkinter.Label(heatFrame, text="Disabled", fg="red")
             titleLabel.pack()
             stateLabel.pack()
             targetLabel.pack()
             currentLabel.pack()
-            enabledLabel.pack()
             #Create object and add to list
-            heaterObject = {"frame" : heatFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "targetLabel" : targetLabel, "currentLabel" : currentLabel, "enabledLabel" : enabledLabel}
+            heaterObject = {"frame" : heatFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "targetLabel" : targetLabel, "currentLabel" : currentLabel}
             self.heaterSettingsObjects.append(heaterObject)
         
         #Pack the settings objects
@@ -547,14 +536,6 @@ class MainWindow(tkinter.Frame):
         
         self.heaterEnableFrame = tkinter.Frame(self.heaterSettingsFrame)
         self.heaterEnableFrame.grid(row=2, column=0)
-
-        self.heaterEnableLabel = tkinter.Label(self.heaterEnableFrame, text="Change State")
-        self.heaterEnableLabel.pack(side="top")
-        #Buttons to allow the heaters to be enabled and disabled
-        self.heaterDisabledButton = tkinter.Button(self.heaterEnableFrame, text="Disable", command=lambda : self.settingChange(1, 0))
-        self.heaterDisabledButton.pack(side="left")
-        self.heaterEnabledButton = tkinter.Button(self.heaterEnableFrame, text="Enable", command=lambda : self.settingChange(1, 1))
-        self.heaterEnabledButton.pack(side="right")
 
         #Agitator settings configuration
         self.agitatorSettingsFrame.grid_rowconfigure(0, weight=1)
@@ -570,15 +551,13 @@ class MainWindow(tkinter.Frame):
         for reactorNum in range(0, 10):
             agiFrame = tkinter.Frame(self.agitatorSettingsDisplayFrame)
             titleLabel = tkinter.Label(agiFrame, text="Agitator {0}".format(reactorNum + 1))
-            stateLabel = tkinter.Label(agiFrame, text="State: Off")
+            stateLabel = tkinter.Label(agiFrame, text="State: Off", fg="red")
             timingLabel = tkinter.Label(agiFrame, text="0s Before Feed")
-            enabledLabel = tkinter.Label(agiFrame, text="Disabled", fg="red")
             titleLabel.pack()
             stateLabel.pack()
             timingLabel.pack()
-            enabledLabel.pack()
             #Create the object and add to the list
-            agitatorObject = {"frame" : agiFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "timingLabel" : timingLabel, "enabledLabel" : enabledLabel}
+            agitatorObject = {"frame" : agiFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "timingLabel" : timingLabel}
             self.agitatorSettingsObjects.append(agitatorObject)
         
         #Pack the objects
@@ -592,14 +571,6 @@ class MainWindow(tkinter.Frame):
 
         self.agitatorEnableFrame = tkinter.Frame(self.agitatorSettingsFrame)
         self.agitatorEnableFrame.grid(row=2, column=0)
-
-        self.agitatorEnableLabel = tkinter.Label(self.agitatorEnableFrame, text="Change State")
-        self.agitatorEnableLabel.pack(side="top")
-        #Buttons to enable or disable the agitator
-        self.agitatorDisabledButton = tkinter.Button(self.agitatorEnableFrame, text="Disable", command=lambda : self.settingChange(1, 0))
-        self.agitatorDisabledButton.pack(side="left")
-        self.agitatorEnabledButton = tkinter.Button(self.agitatorEnableFrame, text="Enable", command=lambda : self.settingChange(1, 1))
-        self.agitatorEnabledButton.pack(side="right")
 
         #Feeder settings configuration
         self.feederSettingsFrame.grid_rowconfigure(0, weight=1)
@@ -616,19 +587,17 @@ class MainWindow(tkinter.Frame):
         for feederNum in range(0, 4):
             feedFrame = tkinter.Frame(self.feederSettingsDisplayFrame)
             titleLabel = tkinter.Label(feedFrame, text="Feeder {0}".format(feederNum + 1))
-            stateLabel = tkinter.Label(feedFrame, text="State: Off")
+            stateLabel = tkinter.Label(feedFrame, text="State: Off", fg="red")
             onTimeLabel = tkinter.Label(feedFrame, text="Feed For: 0s")
             offTimeLabel = tkinter.Label(feedFrame, text="Every 0min")
             nextFeedLabel = tkinter.Label(feedFrame, text="Next Feed: 00:00:00")
-            enabledLabel = tkinter.Label(feedFrame, text="Disabled", fg="red")
             titleLabel.pack()
             stateLabel.pack()
             onTimeLabel.pack()
             offTimeLabel.pack()
             nextFeedLabel.pack()
-            enabledLabel.pack()
             #Create the object and add to the list
-            feederObject = {"frame" : feedFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "onTimeLabel" : onTimeLabel, "offTimeLabel" : offTimeLabel, "enabledLabel" : enabledLabel, "nextFeedLabel" : nextFeedLabel}
+            feederObject = {"frame" : feedFrame, "mainLabel" : titleLabel, "stateLabel" : stateLabel, "onTimeLabel" : onTimeLabel, "offTimeLabel" : offTimeLabel, "nextFeedLabel" : nextFeedLabel}
             self.feederSettingsObjects.append(feederObject)
         
         #Pack the objects
@@ -638,20 +607,6 @@ class MainWindow(tkinter.Frame):
         #Entries to allow the feed time and delay between feeds to be changed
         self.feederTimeEntry = NumberGroup(self.feederSettingsFrame, titles=["Feeding Time (s)", "Time Between Feeds (m)"], header="Change Feed Timings", valueHandler=self.setFeederTiming)
         self.feederTimeEntry.grid(row=1, column=0)
-
-        self.feederEnableFrame = tkinter.Frame(self.feederSettingsFrame)
-        self.feederEnableFrame.grid(row=2, column=0, columnspan=2)
-
-        self.feederEnableLabel = tkinter.Label(self.feederEnableFrame, text="Change State")
-        self.feederEnableLabel.pack(side="top")
-        #Buttons to enable and disable the feeder
-        self.feederDisabledButton = tkinter.Button(self.feederEnableFrame, text="Disable", command=lambda : self.settingChange(1, 0))
-        self.feederDisabledButton.pack(side="left")
-        self.feederEnabledButton = tkinter.Button(self.feederEnableFrame, text="Enable", command=lambda : self.settingChange(1, 1))
-        self.feederEnabledButton.pack(side="right")
-        #Entries to configure beam and syringe properties (currently not used)
-        self.feederConfigEntry = NumberGroup(self.feederSettingsFrame, titles=["Beam Stroke", "Beam Speed", "Feeder X-Section", "Reactor Volume"], header="Change Reactor Configuration", valueHandler=self.setReactorConfig)
-        self.feederConfigEntry.grid(row=1, column=1)
 
         #Hide the settings window
         self.setupWindow.withdraw()
@@ -758,6 +713,13 @@ class MainWindow(tkinter.Frame):
         #Making another attempt to get a valid response from the device
         self.retrying = False
 
+        #[[mix state, mix enabled, mix on time, mix off time], [heat state, heat enabled, heat current temp, heat target temp], [agitate state, agitate enabled, agitate time]]
+        self.statusReactorData = []
+        #[feed status, feed enabled, feed on for, feed off for, feed off until, [next hour, next min, next sec]]
+        self.statusFeederData = []
+        #[timeUnix, date, maintenance]
+        self.statusExtraData = []
+        
         #Whether to show the debugging screen - displays all sent and received messages in a separate window
         self.debugging = False
 
@@ -772,9 +734,6 @@ class MainWindow(tkinter.Frame):
             self.debugWindowObject.grid(row=0, column=0, sticky="NESW")
 
         self.performScan()
-        #Debug for when PLC unavailable to view other screens
-        #self.selectedType.set(self.BLACKSWAN)
-        #self.openMachine()
 
     def pathTo(self, path):
         return os.path.join(self.thisPath, path)
@@ -871,6 +830,14 @@ class MainWindow(tkinter.Frame):
 
         self.numberReactorsInUse = len(shape)
 
+        self.statusReactorData = []
+        self.statusFeederData = []
+        self.statusExtraData = [0, 0, False]
+        for reactor in range(0, self.numberReactorsInUse):
+            self.statusReactorData.append([[False, False, 0, 0, 0], [False, False, 0, 0], [False, False, 0]])
+        for feeder in range(0, len(feedInfo)):
+            self.statusFeederData.append([False, False, 0, 0, 0, [0, 0, 0]])
+
         #OVERHAUL - use machineNumbers[] "mixers", "heaters", "agitators" to get this info
         currentMachineNumbers = self.machineNumbers[machineType]
         numMixers = currentMachineNumbers["mixers"]
@@ -955,8 +922,7 @@ class MainWindow(tkinter.Frame):
         machine = self.selectedType.get()
         #If it is a valid machine type
         if machine > 0 and machine < len(self.machineIdentifiers):
-            #Send the continue message with the correct extension
-            self.add
+            #Send the continue message with the correct extension3
             self.sendMessage("systemset {0}\n".format(self.machineIdentifiers[machine]))
 
     def resentContinueTimer(self) -> None:
@@ -1126,16 +1092,19 @@ class MainWindow(tkinter.Frame):
                 #Begin communications
                 self.connectionReceived(alreadyStarted)
 
-        if len(messageParts > 1) and messageParts[0] == "status":
+        if len(messageParts) > 1 and messageParts[0] == "status":
             try:
                 if messageParts[1] == "start" and len(messageParts) > 3:
                     inMaintenance = messageParts[3] == "1"
+                    self.statusExtraData[2] = inMaintenance
                 elif messageParts[1] == "heater" and len(messageParts) > 6:
                     heaterNumber = int(messageParts[2])
                     heaterEnabled = messageParts[3] == "1"
                     target = float(messageParts[4])
                     actual = float(messageParts[5])
                     heaterOn = messageParts[6] == "1"
+                    if heaterNumber > 0 and heaterNumber <= self.numberReactorsInUse:
+                        self.statusReactorData[heaterNumber - 1][1] = [heaterOn, heaterEnabled, actual, target]
                 elif messageParts[1] == "mixer" and len(messageParts) > 7:
                     mixerNumber = int(messageParts[2])
                     mixerEnabled = messageParts[3] == "1"
@@ -1143,89 +1112,41 @@ class MainWindow(tkinter.Frame):
                     mixOnFor = int(messageParts[5])
                     mixOffFor = int(messageParts[6])
                     mixerOn = messageParts[7] == "1"
+                    if mixerNumber > 0 and mixerNumber <= self.numberReactorsInUse:
+                        self.statusReactorData[mixerNumber - 1][0] = [mixerOn, mixerEnabled, mixerMode, mixOnFor, mixOffFor]
                 elif messageParts[1] == "feeder" and len(messageParts) > 6:
                     feederNumber = int(messageParts[2])
                     feederEnabled = messageParts[3] == "1"
                     feedOnFor = int(messageParts[4])
                     feedOffFor = int(messageParts[5])
                     feederOn = messageParts[6] == "1"
+                    if feederNumber > 0 and feederNumber <= len(self.setupFeederData):
+                        self.statusFeederData[feederNumber - 1] = [feederOn, feederEnabled, feedOnFor, feedOffFor, [0, 0, 0]]
                 elif messageParts[1] == "agitator" and len(messageParts) > 5:
                     agitatorNumber = int(messageParts[2])
                     agitatorEnabled = messageParts[3] == "1"
                     prefeed = int(messageParts[4])
                     agitatorOn = messageParts[5] == "1"
+                    if agitatorNumber > 0 and agitatorNumber <= self.numberReactorsInUse:
+                        self.statusReactorData[agitatorNumber - 1][2] = [agitatorOn, agitatorEnabled, prefeed]
             except:
                 pass
         
         if len(messageParts) > 1 and messageParts[0] == "done" and messageParts[1] == "status":
-            self.updateFromStatus()
-        
-        #If currently receiving a status block
-        if self.gettingStatus:
-            #Allowed characters
-            valid = "0123456789 .-"
-            #If the message only has the valid characters
-            if self.containsOnly(message, valid):
-                #Add the message to the current status
-                #self.currentStatus.append(message)
-                self.currentStatus.append(message.strip())
-                #If the length is correct for an original style status and it hasn't been tried yet
-                if not self.triedOldStatus and self.statusLength != 0 and len(self.currentStatus) >= self.statusLength:
-                    #Attempt to process the status information
-                    success = self.handleStatus()
-                    self.triedOldStatus = True
-                    #If handling worked correctly
-                    if success:
-                        #Update reactor information using the status block
-                        updated = self.updateFromStatus()
-                        self.gettingStatus = False
-                        self.currentStatus = []
-                        #If updating worked correctly
-                        if updated:
-                            #if still starting
-                            if self.loading:
-                                self.loading = False
-                                #Display the machine
-                                self.openMachine()
-                            #Store the time of the most recent status
-                            self.lastStatus = time.time()
-                        else:
-                            #Close the connection the status was not valid
-                            self.connectionFailed()
-                #If it is long enough to be a new status
-                if self.statusLength != 0 and len(self.currentStatus) >= self.statusNewLength:
-                    #Try handling using new format
-                    success = self.handleNewStatus()
-                    #If values could be stored
-                    if success:
-                        #Attempt to update the reactor information
-                        updated = self.updateFromStatus()
-                        self.gettingStatus = False
-                        self.currentStatus = []
-                        #If values were updated correctly
-                        if updated:
-                            #If waiting to open the machine
-                            if self.loading:
-                                self.loading = False
-                                #Display machine info to user
-                                self.openMachine()
-                            #Store last time of status
-                            self.lastStatus = time.time()
-                        else:
-                            #Status was not valid, close the connection
-                            self.connectionFailed()
-                    else:
-                        #Both status types did not work, wrong machine?, close the connection
-                        self.connectionFailed()
-            #If the status timeout occurs
-            elif time.time() - self.lastStatus > self.statusTimeout:
-                #Start new status request
-                self.gettingStatus = False
-                self.pendingMessages.append("statusget\n")
+            updated = self.updateFromStatus()
+            if updated:
+                if self.loading:
+                    self.loading = False
+                    self.openMachine()
                 self.lastStatus = time.time()
-        if not self.gettingStatus:
-            #Send the next message to be sent, if there is one
-            self.sendQueuedMessage()
+            self.gettingStatus = False
+        
+        if len(messageParts) > 1 and messageParts[0] == "done" and messageParts[1] == "systemset":
+            self.awaitingStartup = False
+            self.pendingMessages.append("statusget\n")
+
+        #Send the next message to be sent, if there is one
+        self.sendQueuedMessage()
             
     def connectionFailed(self) -> None:
         '''Display the failed to connect correctly screen'''
@@ -1256,6 +1177,9 @@ class MainWindow(tkinter.Frame):
             if "systemset" not in message or self.awaitingStartup:
                 #Send the message
                 self.sendMessage(message)
+            
+            if "statusget" in message:
+                self.gettingStatus = True
 
             #Remove the message from the pending list
             del self.pendingMessages[0]
@@ -1328,14 +1252,16 @@ class MainWindow(tkinter.Frame):
                     modeText = mixModes[mixData[2]]
                     #Set the label of the state of the mixer
                     modeMessage = "State: {0}".format(modeText)
-                    mixObject["stateLabel"].configure(text=modeMessage)
+                    modeColour = "red"
+                    if modeText == "On":
+                        modeColour = "green"
+                    elif modeText == "Timed":
+                        if mixData[0]:
+                            modeColour = "green"
+                    mixObject["stateLabel"].configure(text=modeMessage, fg=modeColour)
                     #Set the timing label
                     mixObject["timingLabel"].configure(text="{0}s On\n{1}s Off".format(mixData[3], mixData[4]))
                     #Change the text and colour of the enabled label
-                    if mixData[1]:
-                        mixObject["enabledLabel"].configure(text="Enabled", fg="green")
-                    else:
-                        mixObject["enabledLabel"].configure(text="Disabled", fg="red")
 
                     #Store whether or not the reactor is mixing in the reactor data and maintenance info
                     self.reactorMixing[reactorNum] = mixData[0]
@@ -1345,17 +1271,16 @@ class MainWindow(tkinter.Frame):
                 if heatObject != None:
                     #[heat state (bool), heat enabled (bool), heat current temp (float), heat target temp (int)]
                     heatData = reactorData[1]
-                    heatObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(heatData[0])))
+                    heatColour = "red"
+                    if heatData[0]:
+                        heatColour = "green"
+                    heatObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(heatData[0])), fg=heatColour)
                     heatObject["targetLabel"].configure(text="Target: {0}°C".format(heatData[3]))
                     #Change the label to show the target temperature
                     self.reactorTargetTemp[reactorNum] = heatData[3]
                     heatObject["currentLabel"].configure(text="Current: {0}°C".format(heatData[2]))
                     #Change the text and colour of the enabled label
                     self.reactorCurrentTemp[reactorNum] = heatData[2]
-                    if heatData[1]:
-                        heatObject["enabledLabel"].configure(text="Enabled", fg="green")
-                    else:
-                        heatObject["enabledLabel"].configure(text="Disabled", fg="red")
 
                     #Store if the reactor is heating and also in maintenance
                     self.reactorHeating[reactorNum] = heatData[0]
@@ -1368,13 +1293,11 @@ class MainWindow(tkinter.Frame):
                     #If there is agitator data - may no longer be necessary due to new checks for machine information
                     if len(agiData) > 0:
                         #Set the state and timing labels
-                        agiObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(agiData[0])))
+                        agiColour = "red"
+                        if agiData[0]:
+                            agiColour = "green"
+                        agiObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(agiData[0])), fg=agiColour)
                         agiObject["timingLabel"].configure(text="{0}s Before Feed".format(agiData[2]))
-                        #Change the text and colour of the enabled label
-                        if agiData[1]:
-                            agiObject["enabledLabel"].configure(text="Enabled", fg="green")
-                        else:
-                            agiObject["enabledLabel"].configure(text="Disabled", fg="red")
 
                         #Store if currently agitating, in maintenance too
                         self.reactorAgitating[reactorNum] = agiData[0]
@@ -1393,20 +1316,19 @@ class MainWindow(tkinter.Frame):
                 #Get the feeder data and object
                 feedData = self.statusFeederData[feederNum]
                 feederObject = self.feederSettingsObjects[feederNum]
-                if feedData[5][1] < 10:
+                print("Feed Data:", feedData)
+                '''if feedData[5][1] < 10:
                     feedData[5][1] = "0" + str(feedData[5][1])
                 if feedData[5][2] < 10:
-                    feedData[5][2] = "0" + str(feedData[5][2])
+                    feedData[5][2] = "0" + str(feedData[5][2])'''
+                feedColour = "red"
+                if feedData[0]:
+                    feedColour = "green"
                 #Change text labels to show correct information
-                feederObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(feedData[0])))
+                feederObject["stateLabel"].configure(text="State: {0}".format(self.booleanOnOff(feedData[0])), fg=feedColour)
                 feederObject["onTimeLabel"].configure(text="Feed For: {0}s".format(feedData[2]))
                 feederObject["offTimeLabel"].configure(text="Every: {0}min".format(feedData[3]))
                 feederObject["nextFeedLabel"].configure(text="Next Feed: {0}:{1}".format(*feedData[5]))
-                #Change enabled label text and colour
-                if feedData[1]:
-                    feederObject["enabledLabel"].configure(text="Enabled", fg="green")
-                else:
-                    feederObject["enabledLabel"].configure(text="Disabled", fg="red")
                 #Update stored feeder values
                 self.feederFeeding[feederNum] = feedData[0]
                 self.feederDuration[feederNum] = feedData[2]
@@ -1434,14 +1356,14 @@ class MainWindow(tkinter.Frame):
             #If machine in maintenance mode
             if self.statusExtraData[2]:
                 #If console not in maintenance mode
-                if not self.maintenanceMode and "END_MAINTENANCE_MODE\n" not in self.pendingMessages:
+                if not self.maintenanceMode and "maintenanceset 0\n" not in self.pendingMessages:
                     #Close maintenance mode
-                    self.pendingMessages.append("END_MAINTENANCE_MODE\n")
+                    self.pendingMessages.append("maintenanceset 0\n")
             else:
                 #If console in maintenance mode
-                if self.maintenanceMode and "START_MAINTENANCE_MODE\n" not in self.pendingMessages:
+                if self.maintenanceMode and "maintenanceset 1\n" not in self.pendingMessages:
                     #Opne maintenance mode
-                    self.pendingMessages.append("START_MAINTENANCE_MODE\n")
+                    self.pendingMessages.append("maintenanceset 1\n")
         except:
             #Error occurred, failed to update
             print("Error with maintenance data")
@@ -1547,157 +1469,38 @@ class MainWindow(tkinter.Frame):
             else:
                 messagebox.showinfo(title="Enter Value", message="Please enter both time values.")
     
-    def setTime(self) -> None:
-        '''When set time is pressed - updates the time on the connected device'''
-        #Get the current time
-        now = datetime.datetime.now()
-        h = now.hour
-        m = now.minute
-        #s = now.second
-        d = now.day
-        mo = now.month
-        y = now.year
-        #Add a series of commands to the pending messages list so the time is updated
-        self.pendingMessages.extend(["SET_YEAR {0}\n".format(y), "SET_MONTH {0}\n".format(mo), "SET_DAY {0}\n".format(d), "SET_HOUR {0}\n".format(h), "SET_MINS {0}\n".format(m)])
-
     def settingChange(self, option, data) -> None:
         '''When a value has been changed - send the appropiate command to the device to change this'''
-        message = ""
 
         if self.currentSettingsType == 0:
-            #Mixer settings
-            if option == 0 and data in [0, 1, 2]:
-                #Mode change
-                message = "SET_MIX_MODE [reactor] {mode}\n".format(mode = data)
-            if option == 1 and (type(data) == list and len(data) > 1):
-                #Timing change
-                message = "SET_MIX_TIME [reactor] {onTime} {offTime}\n".format(onTime = data[0], offTime = data[1])
-            if option == 2 and data in [0, 1]:
-                #Enabled changed
-                message = "ENABLE_MIXER [reactor] {state}\n".format(state = data)
+            for reactorNum in self.currentSettingsReactors:
+                reactorData = self.statusReactorData[reactorNum - 1][0]
+                print("Reactor Data ({0}):".format(reactorNum - 1), reactorData)
+                #Mixer settings
+                if option == 0 and data in [0, 1, 2]:
+                    #Mode change
+                    self.pendingMessages.append("mixerset {reactor} {mode} {onFor} {offFor}\n".format(reactor = reactorNum, mode = data, onFor = reactorData[3], offFor = reactorData[4]))
+                if option == 1 and (type(data) == list and len(data) > 1):
+                    #Timing change
+                    self.pendingMessages.append("mixerset {reactor} {mode} {onTime} {offTime}\n".format(reactor = reactorNum, mode = reactorData[0], onTime = data[0], offTime = data[1]))
         if self.currentSettingsType == 1:
-            #Heater settings
-            if option == 0 and type(data) == int:
-                #Target Temperature change
-                message = "SET_TEMP [reactor] {targetTemp}\n".format(targetTemp = data)
-            if option == 1 and data in [0, 1]:
-                #Enabled changed
-                message = "ENABLE_HEATER [reactor] {state}\n".format(state = data)
+            for reactorNum in self.currentSettingsReactors:
+                #Heater settings
+                if option == 0 and type(data) == int:
+                    #Target Temperature change
+                    self.pendingMessages.append("heaterset {reactor} {targetTemp}\n".format(reactor = reactorNum, targetTemp = data))
         if self.currentSettingsType == 2:
-            #Agitator settings
-            if option == 0 and type(data) == int:
-                #Timing changed
-                message = "SET_AGITATOR [reactor] {time}\n".format(time = data)
-            if option == 1 and data in [0, 1]:
-                #Enabled changed
-                message = "ENABLE_AGITATOR [reactor] {state}\n".format(state = data)
+            for reactorNum in self.currentSettingsReactors:
+                #Agitator settings
+                if option == 0 and type(data) == int:
+                    #Timing changed
+                    self.pendingMessages.append("agitatorset {reactor} {time}\n".format(reactor = reactorNum, time = data))
         if self.currentSettingsType == 3:
-            #Feeder settings
-            if option == 0 and (type(data) == list and len(data) > 1):
-                #Timings changed
-                message = "SET_FEEDER [feeder] {onTime} {offTime}\n".format(onTime = data[0], offTime = data[1])
-            if option == 1 and data in [0, 1]:
-                #Enabled changed
-                message = "ENABLE_FEEDER [feeder] {state} 1\n".format(state = data)
-        
-        #If there was a valid setting change
-        if message != "":
-            #If this is a reactor
-            if self.currentSettingsType != 3:
-                #Iterate through selected reactors
-                for reactorNum in self.currentSettingsReactors:
-                    #Add the message with the correct reactor number
-                    self.pendingMessages.append(message.replace("[reactor]", str(reactorNum)))
-            else:
-                #Iteratr through selected feeders
-                for feederNum in self.accessedFeeders:
-                    #Add the message with the correct feeder number
-                    self.pendingMessages.append(message.replace("[feeder]", str(feederNum + 1)))
-    
-    def setBeamStrokePressed(self) -> None:
-        '''Update the beam stroke value'''
-        #Get the value from the input
-        value = self.feederBeamStrokeVar.get()
-        #Iterate through open feeders
-        for i in range(0, len(self.accessedFeeders)):
-            #Update the value
-            self.changeFeederSettings(self.accessedFeeders[i], 0, value)
-    
-    def setBeamSpeedPressed(self) -> None:
-        '''Update the beam speed value'''
-        #Get the value from the input
-        value = self.feederBeamSpeedVar.get()
-        #Iterate through open feeders
-        for i in range(0, len(self.accessedFeeders)):
-            #Update the value
-            self.changeFeederSettings(self.accessedFeeders[i], 1, value)
-    
-    def setCrossSectionPressed(self) -> None:
-        '''Update cross section value'''
-        #Get the value from the input
-        value = self.feederCrossSectionVar.get()
-        #Iterate through open feeders
-        for i in range(0, len(self.accessedFeeders)):
-            #Update the value
-            self.changeFeederSettings(self.accessedFeeders[i], 2, value)
-
-    def setReactorVolumePressed(self) -> None:
-        '''Update reactor volume value'''
-        #Get the value from the input
-        value = self.feederReactorVolumeVar.get()
-        #Iterate through open feeders
-        for i in range(0, len(self.accessedFeeders)):
-            #Update the value
-            self.changeFeederSettings(self.accessedFeeders[i], 3, value)
-
-    def setReactorConfig(self, values) -> None:
-        '''Update feeder reactor properties'''
-        #If four valid values were given
-        if len(values) > 3:
-            if values[0] != None and values[1] != None and values[2] != None and values[3] != None:
-                try:
-                    #Convert to 1 decimal place values
-                    beamStroke = (int(values[0] * 10)) / 10.0
-                    beamSpeed = (int(values[1] * 10)) / 10.0
-                    crossSection = (int(values[2] * 10)) / 10.0
-                    volume = (int(values[3] * 10)) / 10.0
-                    #Iterate open feeders
-                    for i in range(0, len(self.accessaedFeeders)):
-                        #Update the values
-                        self.changeFeederSettings(self.accessedFeeders[i], 0, beamStroke)
-                        self.changeFeederSettings(self.accessedFeeders[i], 1, beamSpeed)
-                        self.changeFeederSettings(self.accessedFeeders[i], 2, crossSection)
-                        self.changeFeederSettings(self.accessedFeeders[i], 3, volume)
-                except:
-                    messagebox.showinfo(title="Value Error", message="Each value must be a decimal number.")
-            else:
-                messagebox.showinfo(title="Enter Value", message="Please enter a value for each of the feeder information fields.")
-    
-    def changeFeederSettings(self, feeder : int, option : int, value : int):
-        '''Update the feeder properties - values not currently used by device'''
-        #If valid feeder number
-        if feeder > -1 and feeder < 4:
-            #Increment value (device used 1 - 4 whereas this uses 0 - 3)
-            feeder = feeder + 1
-            message = ""
-            if option == 0:
-                #Beamstroke
-                message = "SET_BEAMSTROKE {0} {1}\n"
-            elif option == 1:
-                #Beamspeed
-                message = "SET_BEAMSPEED {0} {1}\n"
-            elif option == 2:
-                #Syringe cross section
-                message = "SET_SYRINGEXSECT {0} {1}\n"
-            elif option == 3:
-                #Reactor Volume
-                message = "SET_REACTORVOL {0} {1}\n"
-            
-            #If there is a message
-            if message != "":
-                #add to pending
-                message = message.format(feeder, value)
-                self.pendingMessages.append(message)
+            for feederNum in self.accessedFeeders:
+                #Feeder settings
+                if option == 0 and (type(data) == list and len(data) > 1):
+                    #Timings changed
+                    self.pendingMessages.append("feederset {feeder} {onTime} {offTime}\n".format(feeder = feederNum, onTime = data[0], offTime = data[1]))
 
     def openMachine(self) -> None:
         '''Show the machine display to the user'''
@@ -2086,7 +1889,6 @@ class MainWindow(tkinter.Frame):
         self.currentSettingsType = 3
         #Reset inputs
         self.feederTimeEntry.reset()
-        self.feederConfigEntry.reset()
 
         #Store current feeder
         self.accessedFeeders = [feederNum]
@@ -2186,7 +1988,6 @@ class MainWindow(tkinter.Frame):
                     self.currentSettingsType = 3
                     #Clear inputs
                     self.feederTimeEntry.reset()
-                    self.feederConfigEntry.reset()
                     self.accessedFeeders = []
                     #Remove all feeders and add only the ones being used
                     for feedObject in self.feederSettingsObjects:
@@ -2277,7 +2078,7 @@ class MainWindow(tkinter.Frame):
             self.maintenanceFeeders[i]["frame"].grid(row=2, column=start, columnspan=width, sticky="NESW")
         self.maintenanceMode = True
         #Send message to device to begin mainteance
-        self.pendingMessages.append("START_MAINTENANCE_MODE\n")
+        self.pendingMessages.append("maintenanceset 1\n")
         #Switch to maintenance view
         self.changeMainFrame(3)
     
@@ -2285,7 +2086,7 @@ class MainWindow(tkinter.Frame):
         '''Close the maintenance view'''
         self.maintenanceMode = False
         #Send message to device
-        self.pendingMessages.append("END_MAINTENANCE_MODE\n")
+        self.pendingMessages.append("maintenanceset 0\n")
         #Switch to normal view
         self.changeMainFrame(2)
 
@@ -2346,10 +2147,6 @@ class MainWindow(tkinter.Frame):
     def maintenanceChange(self, reactor : int, event : int, data : int) -> None:
         '''Change value in maintenance mode'''
         #event : 0 = mixer 1 = heater 2 = agitator 3 = feeder
-        #Get the correct state value
-        state = "OFF"
-        if data == 1:
-            state = "ON"
         
         #If there is a valid reactor
         if reactor < self.numberReactorsInUse and event != 3:
@@ -2357,18 +2154,18 @@ class MainWindow(tkinter.Frame):
             reactorNum = reactor + 1
             #Choose correct message based on event and add message
             if event == 0:
-                self.pendingMessages.append("MIXER_{0} {1}\n".format(state, reactorNum))
+                self.pendingMessages.append("maintenancemixer {0} {1}\n".format(reactorNum, data))
             elif event == 1:
-                self.pendingMessages.append("HEATER_{0} {1}\n".format(state, reactorNum))
+                self.pendingMessages.append("maintenanceheater {0} {1}\n".format(reactorNum, data))
             elif event == 2:
-                self.pendingMessages.append("AGITATOR_{0} {1}\n".format(state, reactorNum))
+                self.pendingMessages.append("maintenanceagitator {0} {1}\n".format(reactorNum, data))
         
         #If this is a feeder
         if reactor < 4 and event == 3:
             #Increment value
             feederNum = reactor + 1
             #Add feeder message
-            self.pendingMessages.append("FEEDER_{0} {1}\n".format(state, feederNum))
+            self.pendingMessages.append("maintenancefeeder {0} {1}\n".format(feederNum, data))
 
     def closeWindow(self) -> None:
         '''When close is pressed'''
