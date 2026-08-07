@@ -196,10 +196,9 @@ class MainWindow(tkinter.Frame):
             self.radioFrame.grid_rowconfigure(i, weight=1)
 
         for i in range(0, len(self.machineList)):
-            if i > 1:
-                radioButton = tkinter.Radiobutton(self.radioFrame, text=self.machineList[i], variable=self.selectedType, value=i, command=self.typeChanged, font=self.menuFont)
-                radioButton.grid(row=i, column=0, sticky="W")
-                self.machineRadioButtons.append(radioButton)
+            radioButton = tkinter.Radiobutton(self.radioFrame, text=self.machineList[i], variable=self.selectedType, value=i, command=self.typeChanged, font=self.menuFont)
+            radioButton.grid(row=i, column=0, sticky="W")
+            self.machineRadioButtons.append(radioButton)
 
         #Create the connect button
         self.connectButton = tkinter.Button(self.connectOptionsFrame, text="Connect", command=self.connectPressed, font=self.menuFont, bg=self.buttonColour)
@@ -864,7 +863,9 @@ class MainWindow(tkinter.Frame):
                     self.changeMainFrame(1)
                     #Attempt to connect
                     self.serialConnection = serial.Serial(port=self.connectedPort, baudrate=115200, timeout=0)
-                except:
+                except Exception as e:
+                    print("Error with initial connection")
+                    print("Exception Occurred:", e, "On Line:", sys.exc_info()[2].tb_lineno)
                     #If something went wrong
                     success = False
             
@@ -1070,6 +1071,10 @@ class MainWindow(tkinter.Frame):
         if self.serialConnection != None:
             #Repeat after a short delay
             self.after(1, self.checkMessages)
+
+        #Send the next message to be sent, if there is one
+        #if time.time() - self.lastMessageSent >= self.messageDelay:
+        self.sendQueuedMessage()
   
     def messageReceived(self, message) -> None:
         '''Handle the message that was received appropriately'''
@@ -1086,6 +1091,8 @@ class MainWindow(tkinter.Frame):
         if self.awaitingConnection:
             #If this is a timing response
             if "system" in message:
+                if messageParts[1] != "none" and messageParts[1] != self.machineIdentifiers[self.selectedType.get()]:
+                    self.connectionFailed()
                 #Determine if started yet
                 alreadyStarted = messageParts[1] != "none"
                 #Begin communications
@@ -1144,10 +1151,6 @@ class MainWindow(tkinter.Frame):
         if len(messageParts) > 1 and messageParts[0] == "done" and messageParts[1] == "systemset":
             self.awaitingStartup = False
             self.pendingMessages.append("statusget\n")
-
-        #Send the next message to be sent, if there is one
-        #if time.time() - self.lastMessageSent >= self.messageDelay:
-        self.sendQueuedMessage()
             
     def connectionFailed(self) -> None:
         '''Display the failed to connect correctly screen'''
